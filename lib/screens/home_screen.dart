@@ -9,6 +9,7 @@ import '../widgets/summary_card.dart';
 import '../widgets/transaction_tile.dart';
 import 'add_edit_transaction_screen.dart';
 import 'export_screen.dart';
+import 'import_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.uid});
@@ -64,6 +65,22 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _openImport() async {
+    final imported = await Navigator.of(context).push<int>(
+      MaterialPageRoute(
+        builder: (_) => ImportScreen(service: _service),
+      ),
+    );
+    if (imported != null && imported > 0 && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Imported $imported transaction'
+              '${imported == 1 ? '' : 's'}.'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // A single subscription feeds both the body and the FAB. Firestore's
@@ -92,6 +109,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
+              ),
+              IconButton(
+                tooltip: 'Import CSV',
+                icon: const Icon(Icons.upload_file),
+                onPressed: _openImport,
               ),
               IconButton(
                 tooltip: 'Sign out',

@@ -21,10 +21,11 @@ dependencies:
   # State management
   provider: ^6.1.2
 
-  # Formatting + file export / sharing + receipt photos
+  # Formatting + file export / import / sharing + receipt photos
   intl: ^0.19.0
   share_plus: ^10.1.1
   image_picker: ^1.1.2
+  file_picker: ^8.1.2
 
 dev_dependencies:
   flutter_test:

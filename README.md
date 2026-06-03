@@ -25,6 +25,9 @@ software) — plus a CSV for your spreadsheet or accountant.
     Amounts are summed per tax-form line, income positive / expenses negative,
     using the official TXF reference numbers.
   - **`.csv`** — every transaction, line by line, for Excel/Sheets.
+- 📥 **CSV import** — pull transactions back in from a CSV (the app's own export
+  or any file with Date / Category / Amount columns), with a **preview-then-
+  confirm** step before anything is written.
 - ☁️ **Realtime sync** across devices via Cloud Firestore.
 
 ## Project structure
@@ -42,12 +45,14 @@ lib/
     firestore_service.dart        Per-user transaction CRUD + streams
     storage_service.dart          Receipt upload/delete (Firebase Storage)
     export_service.dart           Pure-Dart TXF + CSV generation (unit-tested)
+    import_service.dart           Pure-Dart CSV parsing/import (unit-tested)
   screens/
     auth_gate.dart                Routes to login vs. home
     login_screen.dart            Sign in / register / reset
     home_screen.dart              Dashboard + list + year picker
     add_edit_transaction_screen.dart
     export_screen.dart            Preview + share/copy TXF & CSV
+    import_screen.dart            Pick CSV + preview + confirm import
   widgets/
     summary_card.dart
     transaction_tile.dart
@@ -167,6 +172,24 @@ fallback for manual entry, and TXF works best with the desktop editions.)
 
 TXF reference numbers are from the public spec at
 <https://taxdataexchange.org/docs/txf/v042/>.
+
+## Importing data (CSV)
+
+Tap the **upload icon** in the app bar to import a CSV. `ImportService`
+(`lib/services/import_service.dart`) parses the file entirely on-device:
+
+- It accepts the app's own export, plus any CSV with at least **Date**,
+  **Category** and **Amount** columns (column order and a few header aliases —
+  e.g. `Notes` → description, `Payee / source` → payee — are tolerated).
+- Categories are matched by **label**, falling back to **TXF code**.
+- Dates accept `YYYY-MM-DD` or `MM/DD/YYYY`; amounts tolerate `$`, thousands
+  separators and `(parentheses)` for negatives.
+- You get a **preview** (counts, section totals, per-row problems for any
+  skipped lines) and nothing is written to Firestore until you confirm.
+
+**What can't be imported:** TurboTax's own files (`.tax2024`, etc.) are a
+proprietary, undocumented binary format and cannot be read by this or any
+third-party app. Import via CSV, or via TXF in a future update.
 
 ## Notes & limitations
 

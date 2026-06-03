@@ -363,7 +363,26 @@ class TaxCategories {
     for (final c in all) c.id: c,
   };
 
+  static final Map<String, TaxCategory> _byLabel = {
+    for (final c in all) c.label.toLowerCase(): c,
+  };
+
+  static final Map<String, TaxCategory> _byTxfCode = {
+    for (final c in all)
+      if (c.txfCode != null) c.txfCode!: c,
+  };
+
   static TaxCategory? byId(String? id) => id == null ? null : _byId[id];
+
+  /// Used when importing: matches the human-readable label (case-insensitive).
+  static TaxCategory? byLabel(String? label) =>
+      label == null ? null : _byLabel[label.trim().toLowerCase()];
+
+  /// Used when importing: matches a TXF reference number.
+  static TaxCategory? byTxfCode(String? code) {
+    final trimmed = code?.trim();
+    return (trimmed == null || trimmed.isEmpty) ? null : _byTxfCode[trimmed];
+  }
 
   static List<TaxCategory> forSection(TaxFormSection section) =>
       all.where((c) => c.section == section).toList(growable: false);

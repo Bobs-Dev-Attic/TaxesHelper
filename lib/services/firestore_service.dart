@@ -47,6 +47,21 @@ class FirestoreService {
 
   Future<void> add(TaxTransaction tx) => _col.add(tx.toMap());
 
+  /// Bulk-insert (used by CSV import). Firestore caps a batch at 500 writes,
+  /// so we commit in chunks.
+  Future<void> addAll(List<TaxTransaction> txs) async {
+    const chunkSize = 450;
+    for (var start = 0; start < txs.length; start += chunkSize) {
+      final batch = _db.batch();
+      final end =
+          (start + chunkSize) < txs.length ? start + chunkSize : txs.length;
+      for (var i = start; i < end; i++) {
+        batch.set(_col.doc(), txs[i].toMap());
+      }
+      await batch.commit();
+    }
+  }
+
   Future<void> update(TaxTransaction tx) {
     assert(tx.id != null, 'Cannot update a transaction without an id');
     return _col.doc(tx.id).set(tx.toMap(), SetOptions(merge: true));

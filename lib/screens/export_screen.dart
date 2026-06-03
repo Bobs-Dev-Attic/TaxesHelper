@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../models/tax_transaction.dart';
 import '../services/export_service.dart';
+import 'forms_screen.dart';
 
 /// Lets the user preview and share a TurboTax-ready TXF file or a CSV.
 class ExportScreen extends StatefulWidget {
@@ -55,6 +56,26 @@ class _ExportScreenState extends State<ExportScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Card(
+            child: ListTile(
+              leading: Icon(Icons.picture_as_pdf_outlined,
+                  color: Theme.of(context).colorScheme.primary),
+              title: const Text('Prepopulated tax forms (PDF)'),
+              subtitle: const Text(
+                  'Schedule C & Schedule A worksheet filled with your totals. '
+                  'Preview, print or save.'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => FormsScreen(
+                    taxYear: widget.taxYear,
+                    transactions: widget.transactions,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           _FormatCard(
             title: 'TurboTax / tax software (.txf)',
             description:

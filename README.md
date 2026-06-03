@@ -28,6 +28,9 @@ software) — plus a CSV for your spreadsheet or accountant.
 - 📥 **CSV import** — pull transactions back in from a CSV (the app's own export
   or any file with Date / Category / Amount columns), with a **preview-then-
   confirm** step before anything is written.
+- 🧮 **Prepopulated form worksheets (PDF)** — a generated **Schedule C** and
+  **Schedule A** worksheet with your totals filled onto the real form line
+  numbers, ready to **preview, print, share or save**.
 - ☁️ **Realtime sync** across devices via Cloud Firestore.
 
 ## Project structure
@@ -46,13 +49,16 @@ lib/
     storage_service.dart          Receipt upload/delete (Firebase Storage)
     export_service.dart           Pure-Dart TXF + CSV generation (unit-tested)
     import_service.dart           Pure-Dart CSV parsing/import (unit-tested)
+    form_summary.dart             Pure-Dart Schedule C/A line math (unit-tested)
+    form_pdf_service.dart         Renders the worksheet PDF from the summaries
   screens/
     auth_gate.dart                Routes to login vs. home
     login_screen.dart            Sign in / register / reset
     home_screen.dart              Dashboard + list + year picker
     add_edit_transaction_screen.dart
-    export_screen.dart            Preview + share/copy TXF & CSV
+    export_screen.dart            Preview + share/copy TXF & CSV; opens forms
     import_screen.dart            Pick CSV + preview + confirm import
+    forms_screen.dart             PDF worksheet preview / print / share
   widgets/
     summary_card.dart
     transaction_tile.dart
@@ -190,6 +196,29 @@ Tap the **upload icon** in the app bar to import a CSV. `ImportService`
 **What can't be imported:** TurboTax's own files (`.tax2024`, etc.) are a
 proprietary, undocumented binary format and cannot be read by this or any
 third-party app. Import via CSV, or via TXF in a future update.
+
+## Prepopulated tax-form worksheets (PDF)
+
+From the export screen, tap **Prepopulated tax forms (PDF)**. The app generates
+a **worksheet** that lays your totals onto the real form line numbers:
+
+- **Schedule C** — Part I income (lines 1–7), Part II expenses (lines 8–28),
+  tentative/net profit (lines 29, 31) and, when present, Part III cost of goods
+  sold (lines 36/42).
+- **Schedule A** — each itemized deduction you recorded, with a total.
+
+The math lives in `form_summary.dart` (pure Dart, unit-tested); rendering is in
+`form_pdf_service.dart` using the `pdf` package. The `printing` package's
+`PdfPreview` provides on-device preview plus print / share / save (PDF works on
+mobile, web and desktop).
+
+> **This is a worksheet, not a filed form.** It's a bookkeeping summary to speed
+> data entry and review — not an official IRS submission and not tax advice.
+> It shows *raw* totals; statutory limits (e.g. the medical 7.5%-of-AGI floor,
+> the $10k SALT cap, home-office on Schedule C line 30) are **not** applied —
+> your tax software does that. Filling the *official* fillable IRS PDF is
+> intentionally not done, because the IRS reissues those forms yearly with
+> changing internal field names, which breaks unattended field-mapping.
 
 ## Notes & limitations
 

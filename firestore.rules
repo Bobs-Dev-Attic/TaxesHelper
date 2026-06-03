@@ -1,0 +1,31 @@
+rules_version = '2';
+
+// Each user can only read and write their own transactions. Nothing is
+// world-readable. Basic shape validation guards against malformed writes.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      // The user document itself (if you later store profile data).
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      match /transactions/{transactionId} {
+        allow read, delete: if request.auth != null
+                            && request.auth.uid == userId;
+
+        allow create, update: if request.auth != null
+                              && request.auth.uid == userId
+                              && isValidTransaction(request.resource.data);
+      }
+    }
+  }
+
+  function isValidTransaction(data) {
+    return data.amount is number
+           && data.amount >= 0
+           && data.categoryId is string
+           && data.date is timestamp
+           && data.taxYear is int
+           && data.taxYear >= 2000
+           && data.taxYear <= 2100;
+  }
+}

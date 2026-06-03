@@ -26,6 +26,8 @@ service cloud.firestore {
            && data.date is timestamp
            && data.taxYear is int
            && data.taxYear >= 2000
-           && data.taxYear <= 2100;
+           && data.taxYear <= 2100
+           && (data.receiptPath == null || data.receiptPath is string)
+           && (data.receiptUrl == null || data.receiptUrl is string);
   }
 }

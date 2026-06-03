@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/tax_transaction.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
+import '../services/storage_service.dart';
 import '../widgets/summary_card.dart';
 import '../widgets/transaction_tile.dart';
 import 'add_edit_transaction_screen.dart';
@@ -20,6 +21,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late final FirestoreService _service = FirestoreService(widget.uid);
+  late final StorageService _storage = StorageService(widget.uid);
   late int _taxYear = DateTime.now().year;
   // Cache the stream so rebuilds don't resubscribe to Firestore on every frame.
   late Stream<List<TaxTransaction>> _stream = _service.watchTransactions(_taxYear);
@@ -43,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(
         builder: (_) => AddEditTransactionScreen(
           service: _service,
+          storageService: _storage,
           defaultTaxYear: _taxYear,
           existing: existing,
         ),

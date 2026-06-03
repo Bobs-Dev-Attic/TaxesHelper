@@ -56,10 +56,21 @@ class TransactionTile extends StatelessWidget {
         child: Icon(_icon),
       ),
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(
-        '${category.label} • ${dateFmt.format(transaction.date)}',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+      subtitle: Row(
+        children: [
+          if (transaction.hasReceipt) ...[
+            Icon(Icons.attach_file,
+                size: 14, color: Theme.of(context).colorScheme.outline),
+            const SizedBox(width: 2),
+          ],
+          Expanded(
+            child: Text(
+              '${category.label} • ${dateFmt.format(transaction.date)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
       trailing: Text(
         '$sign${currency.format(transaction.amount)}',

@@ -16,6 +16,8 @@ software) — plus a CSV for your spreadsheet or accountant.
 - 🧾 **Record transactions** as Income, Expense, or Deduction, each mapped to a
   real tax-form line (Schedule C for business, Schedule A for itemized
   deductions).
+- 📎 **Receipt photos** — snap or pick a photo per transaction, stored in
+  Firebase Storage with pinch-to-zoom viewing.
 - 📊 **Dashboard** with per-section totals and an estimated net business profit.
 - 🗓️ **Per-tax-year** filtering; the tax year follows the transaction date.
 - 📤 **Exports**
@@ -38,6 +40,7 @@ lib/
   services/
     auth_service.dart             Firebase Auth wrapper (ChangeNotifier)
     firestore_service.dart        Per-user transaction CRUD + streams
+    storage_service.dart          Receipt upload/delete (Firebase Storage)
     export_service.dart           Pure-Dart TXF + CSV generation (unit-tested)
   screens/
     auth_gate.dart                Routes to login vs. home
@@ -48,10 +51,12 @@ lib/
   widgets/
     summary_card.dart
     transaction_tile.dart
+    receipt_view.dart             Receipt thumbnail + full-screen viewer
 test/
   export_service_test.dart        Unit tests for the export logic
-firestore.rules                   Per-user security rules
+firestore.rules                   Per-user Firestore security rules
 firestore.indexes.json            Composite index (taxYear + date)
+storage.rules                     Per-user Storage rules (receipts)
 firebase.json
 ```
 
@@ -85,11 +90,28 @@ Then, in the Firebase console:
 
 1. **Authentication → Sign-in method →** enable **Email/Password**.
 2. **Firestore Database →** create a database (production mode).
-3. Deploy the security rules and index:
+3. **Storage →** enable Cloud Storage (for receipt photos).
+4. Deploy the security rules and index:
 
    ```bash
-   firebase deploy --only firestore:rules,firestore:indexes
+   firebase deploy --only firestore:rules,firestore:indexes,storage
    ```
+
+### Platform permissions for receipt photos
+
+`image_picker` needs a couple of native declarations:
+
+- **iOS** — add to `ios/Runner/Info.plist`:
+
+  ```xml
+  <key>NSCameraUsageDescription</key>
+  <string>Take photos of receipts to attach to transactions.</string>
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>Attach receipt photos from your library.</string>
+  ```
+
+- **Android** — no extra manifest entries are required for `image_picker`.
+- **Web** — gallery upload works; the device camera is browser-dependent.
 
 ### 4. Run
 
@@ -153,4 +175,7 @@ TXF reference numbers are from the public spec at
 - Sign convention follows the TXF spec (income positive, expenses/deductions
   negative). Some tax importers prefer positive expense amounts — verify after
   import.
-- Receipts/attachments are not stored; add Firebase Storage if you need them.
+- Receipt images are stored in Firebase Storage under
+  `users/{uid}/receipts/`. Deleting a transaction also deletes its receipt;
+  replacing a receipt removes the previous file. Receipts are not embedded in
+  the TXF/CSV exports (those carry the figures only).

@@ -1,20 +1,27 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../models/tax_category.dart';
 import '../models/tax_transaction.dart';
 import '../services/firestore_service.dart';
+import '../services/storage_service.dart';
+import '../widgets/receipt_view.dart';
 
 class AddEditTransactionScreen extends StatefulWidget {
   const AddEditTransactionScreen({
     super.key,
     required this.service,
+    required this.storageService,
     required this.defaultTaxYear,
     this.existing,
   });
 
   final FirestoreService service;
+  final StorageService storageService;
   final int defaultTaxYear;
   final TaxTransaction? existing;
 
@@ -34,7 +41,19 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
   late DateTime _date;
   bool _busy = false;
 
+  // Receipt state.
+  // The receipt currently saved on the transaction (if any).
+  String? _receiptPath;
+  String? _receiptUrl;
+  // The storage path that existed when the screen opened, so we can clean it
+  // up if the user replaces or removes the receipt.
+  String? _originalReceiptPath;
+  // A freshly-picked image not yet uploaded.
+  Uint8List? _pickedBytes;
+  String? _pickedContentType;
+
   bool get _isEditing => widget.existing != null;
+  bool get _hasReceipt => _pickedBytes != null || _receiptUrl != null;
 
   @override
   void initState() {
@@ -49,6 +68,9 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
     _payeeController = TextEditingController(text: existing?.payee ?? '');
     _descriptionController =
         TextEditingController(text: existing?.description ?? '');
+    _receiptPath = existing?.receiptPath;
+    _receiptUrl = existing?.receiptUrl;
+    _originalReceiptPath = existing?.receiptPath;
   }
 
   @override
@@ -80,29 +102,108 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
     if (picked != null) setState(() => _date = picked);
   }
 
+  Future<void> _pickReceipt(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final file = await picker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        imageQuality: 70,
+      );
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      setState(() {
+        _pickedBytes = bytes;
+        _pickedContentType = file.mimeType ?? 'image/jpeg';
+        // Showing the freshly-picked image takes over from any saved one.
+        _receiptUrl = null;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not attach photo: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _chooseReceiptSource() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from library'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source != null) await _pickReceipt(source);
+  }
+
+  void _removeReceipt() {
+    setState(() {
+      _pickedBytes = null;
+      _pickedContentType = null;
+      _receiptUrl = null;
+      _receiptPath = null;
+    });
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _busy = true);
 
-    final amount = double.parse(_amountController.text.replaceAll(',', '').trim());
-    final tx = TaxTransaction(
-      id: widget.existing?.id,
-      amount: amount,
-      categoryId: _category.id,
-      date: _date,
-      description: _descriptionController.text.trim(),
-      payee: _payeeController.text.trim(),
-      // The tax year follows the transaction date so exports stay correct.
-      taxYear: _date.year,
-      createdAt: widget.existing?.createdAt,
-    );
-
     try {
+      // Upload a newly-picked receipt first, so the transaction we write
+      // already points at the stored image.
+      if (_pickedBytes != null) {
+        final uploaded = await widget.storageService.uploadReceipt(
+          _pickedBytes!,
+          contentType: _pickedContentType ?? 'image/jpeg',
+        );
+        _receiptPath = uploaded.path;
+        _receiptUrl = uploaded.url;
+      }
+
+      final amount =
+          double.parse(_amountController.text.replaceAll(',', '').trim());
+      final tx = TaxTransaction(
+        id: widget.existing?.id,
+        amount: amount,
+        categoryId: _category.id,
+        date: _date,
+        description: _descriptionController.text.trim(),
+        payee: _payeeController.text.trim(),
+        // The tax year follows the transaction date so exports stay correct.
+        taxYear: _date.year,
+        createdAt: widget.existing?.createdAt,
+        receiptPath: _receiptPath,
+        receiptUrl: _receiptUrl,
+      );
+
       if (_isEditing) {
         await widget.service.update(tx);
       } else {
         await widget.service.add(tx);
       }
+
+      // Once the write succeeds, delete the old image if it was replaced or
+      // removed. Best-effort: a failure here shouldn't block the save.
+      if (_originalReceiptPath != null &&
+          _originalReceiptPath != _receiptPath) {
+        await widget.storageService.deleteReceipt(_originalReceiptPath!);
+      }
+
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
@@ -135,6 +236,10 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
     if (confirm != true) return;
     try {
       await widget.service.delete(widget.existing!.id!);
+      final path = widget.existing!.receiptPath;
+      if (path != null) {
+        await widget.storageService.deleteReceipt(path);
+      }
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
@@ -272,6 +377,8 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
                   border: OutlineInputBorder(),
                 ),
               ),
+              const SizedBox(height: 20),
+              _buildReceiptSection(),
               const SizedBox(height: 24),
               FilledButton.icon(
                 onPressed: _busy ? null : _save,
@@ -286,6 +393,51 @@ class _AddEditTransactionScreenState extends State<AddEditTransactionScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReceiptSection() {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.receipt_long_outlined, color: theme.colorScheme.primary),
+            const SizedBox(width: 8),
+            Text('Receipt', style: theme.textTheme.titleSmall),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_hasReceipt)
+          ReceiptThumbnail(
+            bytes: _pickedBytes,
+            url: _receiptUrl,
+            onView: _viewReceipt,
+            onRemove: _busy ? null : _removeReceipt,
+          )
+        else
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _chooseReceiptSource,
+            icon: const Icon(Icons.add_a_photo_outlined),
+            label: const Text('Attach a receipt photo'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _viewReceipt() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => ReceiptViewerScreen(
+          bytes: _pickedBytes,
+          url: _receiptUrl,
         ),
       ),
     );

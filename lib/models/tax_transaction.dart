@@ -13,6 +13,12 @@ class TaxTransaction {
   final int taxYear;
   final DateTime? createdAt;
 
+  /// Firebase Storage object path of the attached receipt, if any.
+  final String? receiptPath;
+
+  /// Download URL for the attached receipt, if any.
+  final String? receiptUrl;
+
   const TaxTransaction({
     this.id,
     required this.amount,
@@ -22,33 +28,16 @@ class TaxTransaction {
     required this.payee,
     required this.taxYear,
     this.createdAt,
+    this.receiptPath,
+    this.receiptUrl,
   });
+
+  bool get hasReceipt => receiptUrl != null && receiptUrl!.isNotEmpty;
 
   TaxCategory get category =>
       TaxCategories.byId(categoryId) ?? TaxCategories.unknown;
 
   TaxFormSection get section => category.section;
-
-  TaxTransaction copyWith({
-    String? id,
-    double? amount,
-    String? categoryId,
-    DateTime? date,
-    String? description,
-    String? payee,
-    int? taxYear,
-  }) {
-    return TaxTransaction(
-      id: id ?? this.id,
-      amount: amount ?? this.amount,
-      categoryId: categoryId ?? this.categoryId,
-      date: date ?? this.date,
-      description: description ?? this.description,
-      payee: payee ?? this.payee,
-      taxYear: taxYear ?? this.taxYear,
-      createdAt: createdAt,
-    );
-  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -61,6 +50,8 @@ class TaxTransaction {
       'createdAt': createdAt == null
           ? FieldValue.serverTimestamp()
           : Timestamp.fromDate(createdAt!),
+      'receiptPath': receiptPath,
+      'receiptUrl': receiptUrl,
     };
   }
 
@@ -76,6 +67,8 @@ class TaxTransaction {
       payee: map['payee'] as String? ?? '',
       taxYear: (map['taxYear'] as num?)?.toInt() ?? DateTime.now().year,
       createdAt: rawCreated is Timestamp ? rawCreated.toDate() : null,
+      receiptPath: map['receiptPath'] as String?,
+      receiptUrl: map['receiptUrl'] as String?,
     );
   }
 }
